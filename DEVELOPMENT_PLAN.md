@@ -378,6 +378,13 @@ interface ChampSelectState {
 - Tailwind 类名可正常使用
 - 页面显示空白深色背景
 
+**Git 提交：**
+```bash
+git add -A
+git commit -m "feat: 初始化 Vite + React + TS 项目，配置 Tailwind 和 Zustand"
+git push origin master
+```
+
 ---
 
 ### 阶段 2：通用 UI 组件 + 英雄池
@@ -418,6 +425,13 @@ interface ChampSelectState {
 - 板凳席正常显示
 - Header 金色风格还原
 
+**Git 提交：**
+```bash
+git add -A
+git commit -m "feat: 完成 ChampionIcon/GoldButton/ChampionPool/BenchRow/HeaderBar 组件"
+git push origin master
+```
+
 ---
 
 ### 阶段 3：队伍面板 + 玩家信息
@@ -452,6 +466,13 @@ interface ChampSelectState {
 - Mock 数据中当前用户 Slot 有高亮区分
 - 掷骰子按钮点击可触发（console.log 即可）
 - 倒计时数字正确显示
+
+**Git 提交：**
+```bash
+git add -A
+git commit -m "feat: 完成 PlayerSlot/TeamPanel/RerollBar/Countdown 组件"
+git push origin master
+```
 
 ---
 
@@ -489,6 +510,13 @@ interface ChampSelectState {
 - 技能图标可点击切换描述
 - 底部按钮状态正确（有英雄选中时可点击确认）
 - 整体布局与截图一致
+
+**Git 提交：**
+```bash
+git add -A
+git commit -m "feat: 完成 ChampionDetail/FooterBar，组装 ChampSelectPage 主页面"
+git push origin master
+```
 
 ---
 
@@ -528,6 +556,13 @@ interface ChampSelectState {
 - 所有动画流畅
 - WebSocket 接口定义完整，mock 模式可运行
 - TypeScript 编译零错误，无 `any`
+
+**Git 提交：**
+```bash
+git add -A
+git commit -m "feat: 完成 Store 交互逻辑、CSS 动画、WebSocket 接口预埋"
+git push origin master
+```
 
 ---
 
