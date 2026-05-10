@@ -5,6 +5,7 @@ import { getRandomChampionIds } from '../../data/champions-index';
 export function createMockWsService(initialSnapshot: RoomSnapshot): IWebSocketService {
   let handlers: MessageHandler[] = [];
   let timer: ReturnType<typeof setInterval> | null = null;
+  let enemyPickTimer: ReturnType<typeof setInterval> | null = null;
   let remaining = initialSnapshot.countdown;
   let currentSnapshot = { ...initialSnapshot };
 
@@ -14,25 +15,44 @@ export function createMockWsService(initialSnapshot: RoomSnapshot): IWebSocketSe
 
   return {
     async connect(_roomId: string): Promise<void> {
-      // 模拟连接延迟后推送初始快照
+      // Push initial snapshot after short delay
       setTimeout(() => {
         emit({ type: 'ROOM_SNAPSHOT', payload: currentSnapshot });
       }, 100);
 
-      // 模拟后端每秒广播倒计时
+      // Backend ticks countdown every second
       timer = setInterval(() => {
         remaining -= 1;
         if (remaining <= 0) {
           emit({ type: 'PHASE_CHANGE', phase: 'LOCKED' });
           if (timer) clearInterval(timer);
+          if (enemyPickTimer) clearInterval(enemyPickTimer);
           return;
         }
         emit({ type: 'TICK', time: remaining });
       }, 1000);
+
+      // Simulate enemy picks every 5 seconds
+      let enemyIdx = 0;
+      enemyPickTimer = setInterval(() => {
+        if (enemyIdx >= currentSnapshot.enemyTeam.length) {
+          if (enemyPickTimer) clearInterval(enemyPickTimer);
+          return;
+        }
+        const enemy = currentSnapshot.enemyTeam[enemyIdx];
+        const randomChamp = currentSnapshot.availableChampions[
+          Math.floor(Math.random() * currentSnapshot.availableChampions.length)
+        ];
+        if (randomChamp !== undefined) {
+          emit({ type: 'PLAYER_PICK', playerId: enemy.id, championId: randomChamp });
+        }
+        enemyIdx++;
+      }, 5000);
     },
 
     disconnect(): void {
       if (timer) clearInterval(timer);
+      if (enemyPickTimer) clearInterval(enemyPickTimer);
       handlers = [];
     },
 
@@ -69,13 +89,21 @@ export function createMockWsService(initialSnapshot: RoomSnapshot): IWebSocketSe
           break;
         }
 
-        case 'SWAP_BENCH':
+        case 'SWAP_BENCH': {
+          const newAvailable = getRandomChampionIds(42);
+          const newBench = [...currentSnapshot.benchChampions];
+          currentSnapshot = {
+            ...currentSnapshot,
+            availableChampions: newAvailable,
+            benchChampions: newBench,
+          };
           emit({
             type: 'POOL_UPDATE',
-            available: currentSnapshot.availableChampions,
-            bench: currentSnapshot.benchChampions,
+            available: newAvailable,
+            bench: newBench,
           });
           break;
+        }
       }
     },
 

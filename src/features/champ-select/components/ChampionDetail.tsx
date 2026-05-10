@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { useChampSelectStore } from '../store';
 import type { SkillInfo } from '../types';
 
@@ -8,6 +8,11 @@ function ChampionDetailInner() {
   const detailChampionId = useChampSelectStore(s => s.detailChampionId);
   const allChampions = useChampSelectStore(s => s.allChampions);
   const [activeSkillKey, setActiveSkillKey] = useState<'P' | 'Q' | 'W' | 'E' | 'R'>('Q');
+
+  // Reset to Q skill when champion changes
+  useEffect(() => {
+    setActiveSkillKey('Q');
+  }, [detailChampionId]);
 
   const champMap = new Map(allChampions.map(c => [c.id, c]));
   const champion = detailChampionId !== null ? champMap.get(detailChampionId) : null;
@@ -36,7 +41,7 @@ function ChampionDetailInner() {
 
   return (
     <div
-      className="flex h-full flex-col overflow-hidden"
+      className="fade-in flex h-full flex-col overflow-hidden"
       style={{
         backgroundColor: 'var(--bg-panel)',
         border: '2px solid var(--gold-dark)',
@@ -95,7 +100,7 @@ function ChampionDetailInner() {
               onClick={() => setActiveSkillKey(key)}
             >
               <div
-                className="flex items-center justify-center overflow-hidden"
+                className={`flex items-center justify-center overflow-hidden ${isActive ? 'skill-active' : ''}`}
                 style={{
                   width: 36,
                   height: 36,

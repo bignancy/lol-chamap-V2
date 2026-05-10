@@ -35,7 +35,10 @@ function App() {
 
   if (allChampions.length === 0) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <div
+        className="flex h-screen w-screen items-center justify-center"
+        style={{ backgroundColor: 'var(--bg-primary)' }}
+      >
         <span style={{ color: 'var(--text-secondary)' }}>加载中...</span>
       </div>
     );
@@ -44,31 +47,37 @@ function App() {
   return (
     <div
       className="flex h-screen w-screen flex-col"
-      style={{ backgroundColor: 'var(--bg-primary)' }}
+      style={{
+        background:
+          'linear-gradient(135deg, #0a1628 0%, #0e2042 40%, #0a1628 100%)',
+      }}
     >
       <HeaderBar />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left side: Pool + Teams */}
-        <div className="flex flex-1 flex-col overflow-hidden p-3 gap-2">
+        <div className="flex flex-1 flex-col overflow-hidden p-3 pb-1 gap-2">
           <Countdown />
           <ChampionPool />
           <BenchRow />
           <RerollBar />
 
           {/* Team Panels */}
-          <div className="flex flex-1 gap-3">
+          <div className="flex flex-1 gap-3 min-h-0">
             <TeamPanel team={myTeam} side="BLUE" />
+
+            {/* Center divider */}
             <div
               className="w-px shrink-0 self-stretch"
               style={{ backgroundColor: 'var(--gold-dark)' }}
             />
+
             <TeamPanel team={enemyTeam} side="RED" />
           </div>
         </div>
 
         {/* Right side: Champion Detail */}
-        <div className="w-[380px] shrink-0 p-3">
+        <div className="shrink-0 p-3 pl-0" style={{ width: 380 }}>
           <ChampionDetail />
         </div>
       </div>

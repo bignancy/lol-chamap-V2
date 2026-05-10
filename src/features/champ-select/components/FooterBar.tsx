@@ -13,7 +13,7 @@ function FooterBarInner() {
 
   return (
     <div
-      className="flex items-center justify-between px-4 py-2"
+      className="flex items-center justify-between px-4 py-2.5"
       style={{
         borderTop: '2px solid var(--gold-dark)',
         backgroundColor: 'var(--bg-panel)',
@@ -23,24 +23,40 @@ function FooterBarInner() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="cursor-pointer border-none px-4 py-1.5 text-xs font-medium"
+          className="btn-press cursor-pointer border-none px-5 py-2 text-xs font-medium transition-colors duration-150"
           style={{
             backgroundColor: 'var(--btn-hover)',
             color: 'var(--text-secondary)',
             clipPath:
               'polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px)',
           }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
+            (e.currentTarget as HTMLElement).style.backgroundColor = '#2a3038';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+            (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--btn-hover)';
+          }}
         >
           菜单
         </button>
         <button
           type="button"
-          className="cursor-pointer border-none px-4 py-1.5 text-xs font-medium"
+          className="btn-press cursor-pointer border-none px-5 py-2 text-xs font-medium transition-colors duration-150"
           style={{
             backgroundColor: 'var(--btn-hover)',
             color: 'var(--text-secondary)',
             clipPath:
               'polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px)',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
+            (e.currentTarget as HTMLElement).style.backgroundColor = '#2a3038';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+            (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--btn-hover)';
           }}
         >
           交换请求

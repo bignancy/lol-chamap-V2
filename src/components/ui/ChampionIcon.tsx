@@ -50,9 +50,14 @@ function ChampionIconInner({
 
   const showOverlay = state === 'disabled' || state === 'locked';
 
+  const wrapperClass = [
+    'relative cursor-pointer select-none champ-icon-glow',
+    state === 'selected' ? 'selected-pulse' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div
-      className="relative cursor-pointer select-none"
+      className={wrapperClass}
       style={{ width: px, height: px }}
       onClick={onClick}
       onMouseEnter={onMouseEnter}

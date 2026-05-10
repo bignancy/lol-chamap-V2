@@ -26,7 +26,7 @@ function GoldButtonInner({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="relative cursor-pointer select-none border-none outline-none transition-all duration-150"
+      className="btn-press relative cursor-pointer select-none border-none outline-none transition-all duration-150"
       style={{
         padding,
         fontSize,

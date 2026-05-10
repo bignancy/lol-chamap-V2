@@ -34,6 +34,82 @@ body,
   font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gold-dark);
+  border-radius: 2px;
+}
+
+/* ===== Animations ===== */
+
+/* Champion icon hover glow */
+.champ-icon-glow {
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.champ-icon-glow:hover {
+  filter: brightness(1.2) drop-shadow(0 0 6px rgba(200, 170, 110, 0.6));
+  transform: scale(1.05);
+}
+
+/* Selected border pulse */
+@keyframes selectedPulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(200, 170, 110, 0.4); }
+  50% { box-shadow: 0 0 12px rgba(200, 170, 110, 0.8); }
+}
+.selected-pulse {
+  animation: selectedPulse 2s ease-in-out infinite;
+}
+
+/* Detail panel fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Skill icon transition */
+@keyframes skillHighlight {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.skill-active {
+  animation: skillHighlight 0.25s ease-out;
+}
+
+/* Countdown pulse when low */
+@keyframes countdownPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.countdown-low {
+  animation: countdownPulse 0.8s ease-in-out infinite;
+  color: #ee4444 !important;
+}
+
+/* Button press effect */
+.btn-press {
+  transition: transform 0.1s ease;
+}
+.btn-press:active {
+  transform: scale(0.96);
+}
+
+/* Gold border shimmer */
+@keyframes shimmer {
+  0% { border-color: var(--gold-dark); }
+  50% { border-color: var(--gold-primary); }
+  100% { border-color: var(--gold-dark); }
+}
+
 /* LOL Diamond Clip-Path */
 .clip-diamond {
   clip-path: polygon(
