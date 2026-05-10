@@ -9,9 +9,10 @@ import { Countdown } from './features/champ-select/components/Countdown';
 import { ChampionPool } from './features/champ-select/components/ChampionPool';
 import { BenchRow } from './features/champ-select/components/BenchRow';
 import { RerollBar } from './features/champ-select/components/RerollBar';
+import { TeamPanel } from './features/champ-select/components/TeamPanel';
 
 function App() {
-  const { initWs, setAllChampions, allChampions } = useChampSelectStore();
+  const { initWs, setAllChampions, allChampions, myTeam, enemyTeam } = useChampSelectStore();
 
   useEffect(() => {
     if (config.USE_MOCK) {
@@ -30,7 +31,6 @@ function App() {
     };
   }, [initWs, setAllChampions]);
 
-  // Wait for champion data
   if (allChampions.length === 0) {
     return (
       <div className="flex h-screen w-screen items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -44,11 +44,9 @@ function App() {
       className="flex h-screen w-screen flex-col"
       style={{ backgroundColor: 'var(--bg-primary)' }}
     >
-      {/* Header */}
       <HeaderBar />
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden p-3 gap-3">
+      <div className="flex flex-1 flex-col overflow-hidden gap-2 p-3">
         {/* Countdown */}
         <Countdown />
 
@@ -61,12 +59,25 @@ function App() {
         {/* Reroll Bar */}
         <RerollBar />
 
-        {/* TODO: Phase 3 - Team Panels */}
+        {/* Team Panels */}
+        <div className="flex flex-1 gap-4">
+          <TeamPanel team={myTeam} side="BLUE" />
+
+          {/* Center divider */}
+          <div
+            className="w-px shrink-0 self-stretch"
+            style={{ backgroundColor: 'var(--gold-dark)' }}
+          />
+
+          <TeamPanel team={enemyTeam} side="RED" />
+        </div>
+
+        {/* TODO: Phase 4 - Champion Detail + Footer */}
         <div
-          className="flex-1 flex items-center justify-center"
+          className="py-2 text-center text-xs"
           style={{ color: 'var(--text-disabled)' }}
         >
-          阶段 3 - 队伍面板开发中...
+          阶段 4 - 英雄详情 + 底部栏待开发
         </div>
       </div>
     </div>
