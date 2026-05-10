@@ -21,6 +21,12 @@
 
 - 聊天区域（截图中红色框选部分）完全移除
 
+### 1.4 核心原则
+
+1. **前端可独立运行** — 不依赖后端即可完整测试所有交互
+2. **后期无缝接入 SpringBoot** — 通过服务层抽象，切换 Mock/Real 模式只需改环境变量
+3. **英雄数据使用 Riot Data Dragon CDN** — 不自己造图，直接引用官方资源
+
 ---
 
 ## 二、UI 界面分区详解
@@ -127,13 +133,7 @@ clip-path: polygon(
 ```
 src/
 ├── assets/
-│   ├── champions/          # 英雄头像 / 立绘 / 技能图标
-│   │   ├── icons/          # 48x48 头像
-│   │   ├── splash/         # 立绘大图
-│   │   └── skills/         # 技能图标
-│   ├── spells/             # 召唤师技能图标
-│   ├── runes/              # 符文图标
-│   └── backgrounds/        # 背景图
+│   └── backgrounds/        # 背景图（英雄头像/立绘/技能图直接用 Data Dragon CDN）
 ├── components/
 │   ├── ui/                 # 通用 UI 原子组件
 │   │   ├── ChampionIcon.tsx
@@ -156,11 +156,17 @@ src/
 │       ├── store.ts        # Zustand Store
 │       ├── types.ts        # 类型定义
 │       └── index.tsx       # 页面主入口
-├── services/
-│   ├── api.ts              # Axios (预留)
-│   └── websocket.ts        # STOMP (预留)
+├── services/               # 服务层（关键：Mock/Real 通过接口抽象切换）
+│   ├── api.ts              # HTTP 服务接口定义 + Axios 实现
+│   ├── websocket.ts        # WS 服务接口定义 + STOMP 实现
+│   └── mock/
+│       ├── mock-api.ts     # HTTP Mock 实现
+│       ├── mock-ws.ts      # WS Mock 实现（含模拟倒计时广播）
+│       └── mock-room.ts    # 完整 Mock 房间状态生成器
+├── config/
+│   └── env.ts              # 环境变量配置（API_BASE_URL / WS_URL / USE_MOCK）
 ├── data/
-│   └── mock-champions.ts   # Mock 数据
+│   └── champions-index.ts  # 英雄 Data Dragon ID 索引表
 ├── styles/
 │   ├── globals.css         # Tailwind 基础 + CSS 变量
 │   └── cham-select.module.css
@@ -251,7 +257,7 @@ export type WSResponse =
   | { type: 'TICK'; time: number }
   | { type: 'PHASE_CHANGE'; phase: RoomPhase };
 
-/** 房间快照（初始化用） */
+//** 房间快照（初始化用） */
 export interface RoomSnapshot {
   roomId: string;
   phase: RoomPhase;
@@ -266,7 +272,189 @@ export interface RoomSnapshot {
 
 ---
 
-## 六、Zustand Store 设计
+## 六、服务层抽象（Mock/Real 无缝切换）
+
+这是前端能独立测试 + 后期接入 SpringBoot 的核心设计。
+
+### 6.1 环境变量配置
+
+```typescript
+// config/env.ts
+
+export const config = {
+  /** 后端 API 地址，SpringBoot 服务地址 */
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api',
+  /** WebSocket 地址 */
+  WS_URL: import.meta.env.VITE_WS_URL ?? 'http://localhost:8080/ws',
+  /** 是否使用 Mock 模式（前端独立测试时为 true） */
+  USE_MOCK: import.meta.env.VITE_USE_MOCK === 'true',
+} as const;
+```
+
+```env
+# .env.development（前端独立开发）
+VITE_USE_MOCK=true
+
+# .env.production（对接 SpringBoot）
+VITE_USE_MOCK=false
+VITE_API_BASE_URL=http://localhost:8080/api
+VITE_WS_URL=http://localhost:8080/ws
+```
+
+### 6.2 服务层接口定义
+
+```typescript
+// services/api.ts — HTTP 接口
+
+import type { Champion, RoomSnapshot } from '../features/champ-select/types';
+
+/** HTTP 服务接口（Mock 和 Real 都实现此接口） */
+export interface IApiService {
+  /** 获取全量英雄数据 */
+  getChampions(): Promise<Champion[]>;
+  /** 获取当前房间快照 */
+  getRoomSnapshot(roomId: string): Promise<RoomSnapshot>;
+}
+
+/** 真实实现（Axios，对接 SpringBoot） */
+export function createRealApiService(baseUrl: string): IApiService {
+  // 后期实现：import axios from 'axios'
+  // return { getChampions: () => axios.get(...) ... }
+  throw new Error('Real API not implemented yet');
+}
+```
+
+```typescript
+// services/websocket.ts — WebSocket 接口
+
+import type { WSAction, WSResponse } from '../features/champ-select/types';
+
+type MessageHandler = (response: WSResponse) => void;
+
+/** WebSocket 服务接口 */
+export interface IWebSocketService {
+  /** 建立连接 */
+  connect(roomId: string): Promise<void>;
+  /** 断开连接 */
+  disconnect(): void;
+  /** 发送动作 */
+  send(action: WSAction): void;
+  /** 注册消息回调 */
+  subscribe(handler: MessageHandler): () => void;  // 返回 unsubscribe 函数
+}
+
+/** 真实实现（SockJS + STOMP，对接 SpringBoot） */
+export function createRealWsService(url: string): IWebSocketService {
+  // 后期实现：SockJS + @stomp/stompjs
+  // connect() → stompClient.activate()
+  // send() → stompClient.publish({ destination: '/app/room/...', body: JSON.stringify(action) })
+  // subscribe() → stompClient.subscribe('/topic/room/...', handler)
+  throw new Error('Real WebSocket not implemented yet');
+}
+```
+
+### 6.3 Mock 实现
+
+```typescript
+// services/mock/mock-ws.ts
+
+import type { IWebSocketService } from '../websocket';
+import type { WSAction, WSResponse, RoomSnapshot } from '../../features/champ-select/types';
+
+/** Mock WS：模拟后端行为 */
+export function createMockWsService(
+  snapshot: RoomSnapshot,
+  onUpdate: (response: WSResponse) => void
+): IWebSocketService {
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let handlers: MessageHandler[] = [];
+
+  return {
+    async connect() {
+      // 模拟连接成功后推送初始快照
+      setTimeout(() => {
+        emit({ type: 'ROOM_SNAPSHOT', payload: snapshot });
+      }, 100);
+
+      // 模拟后端每秒广播倒计时
+      let remaining = snapshot.countdown;
+      timer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          emit({ type: 'PHASE_CHANGE', phase: 'LOCKED' });
+          if (timer) clearInterval(timer);
+          return;
+        }
+        emit({ type: 'TICK', time: remaining });
+      }, 1000);
+    },
+
+    disconnect() {
+      if (timer) clearInterval(timer);
+      handlers = [];
+    },
+
+    send(action: WSAction) {
+      // 模拟后端处理逻辑
+      switch (action.type) {
+        case 'SELECT_CHAMPION':
+          emit({ type: 'PLAYER_PICK', playerId: snapshot.currentUser.id, championId: action.championId });
+          break;
+        case 'LOCK_IN':
+          emit({ type: 'PLAYER_LOCK', playerId: snapshot.currentUser.id });
+          break;
+        case 'REROLL':
+          // 模拟 reroll 后更新英雄池
+          emit({ type: 'POOL_UPDATE', available: [...snapshot.availableChampions], bench: [...snapshot.benchChampions] });
+          break;
+      }
+    },
+
+    subscribe(handler) {
+      handlers.push(handler);
+      return () => { handlers = handlers.filter(h => h !== handler); };
+    },
+  };
+
+  function emit(response: WSResponse) {
+    handlers.forEach(h => h(response));
+  }
+}
+```
+
+### 6.4 SpringBoot 对接约定
+
+前端与 SpringBoot 后端的通信协议约定如下：
+
+**HTTP 端点：**
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/champions` | 获取全量英雄数据 |
+| GET | `/api/rooms/{roomId}` | 获取房间快照 |
+| POST | `/api/rooms/{roomId}/join` | 加入房间 |
+
+**WebSocket（STOMP）：**
+
+| 方向 | Destination | 消息体 | 说明 |
+|------|-------------|--------|------|
+| 前端 → 后端 | `/app/room/{roomId}/select` | `{ championId: number }` | 选英雄 |
+| 前端 → 后端 | `/app/room/{roomId}/lock` | 空 | 锁定 |
+| 前端 → 后端 | `/app/room/{roomId}/reroll` | 空 | 掷骰子 |
+| 前端 → 后端 | `/app/room/{roomId}/swap-bench` | `{ championId: number }` | 从板凳交换 |
+| 后端 → 前端 | `/topic/room/{roomId}` | `WSResponse` 联合类型 | 房间状态广播 |
+
+**接入步骤（后期）：**
+1. `.env.production` 设置 `VITE_USE_MOCK=false` + 真实地址
+2. `services/api.ts` 中实现 `createRealApiService`
+3. `services/websocket.ts` 中实现 `createRealWsService`
+4. 组件代码**零改动**，因为所有组件只依赖 Store，不直接调用服务
+
+---
+
+## 七、Zustand Store 设计
+
+Store 是唯一的状态来源。组件只读写 Store，不直接调用服务。服务层通过 `initStore` 注入。
 
 ```typescript
 // features/champ-select/store.ts
@@ -276,6 +464,7 @@ import type {
   Champion, Player, RoomPhase, ChatMessage,
   WSAction, WSResponse
 } from './types';
+import type { IWebSocketService } from '../../services/websocket';
 
 interface ChampSelectState {
   // ---- 房间基础 ----
@@ -301,7 +490,11 @@ interface ChampSelectState {
   hoveredChampionId: number | null;
   detailChampionId: number | null;
 
-  // ---- Actions (纯前端) ----
+  // ---- WS 引用 ----
+  wsService: IWebSocketService | null;
+
+  // ---- Actions ----
+  initWs: (ws: IWebSocketService, roomId: string) => void;
   setCountdown: (time: number) => void;
   setPhase: (phase: RoomPhase) => void;
   selectChampion: (id: number) => void;
@@ -312,16 +505,77 @@ interface ChampSelectState {
   reroll: () => void;
   swapFromBench: (championId: number) => void;
   addChatMessage: (msg: ChatMessage) => void;
-  initFromSnapshot: (data: import('./types').RoomSnapshot) => void;
-
-  // ---- WS Action 发送（预留） ----
-  sendAction: (action: WSAction) => void;
+  handleWsResponse: (response: WSResponse) => void;
+  dispose: () => void;
 }
+```
+
+**数据流：**
+```
+用户操作 → 组件调用 Store Action → Store 调用 wsService.send(action)
+                                          ↓
+                         wsService 推送 WSResponse → Store.handleWsResponse()
+                                          ↓
+                                    Store 状态更新 → 组件自动重渲染
+```
+
+**关键：Mock 模式下 `wsService` 是 `mock-ws.ts`，Real 模式下是 `websocket.ts`（STOMP），组件无感知。**
+
+---
+
+## 八、英雄资源（Riot Data Dragon CDN）
+
+不本地存储英雄图片，直接引用 Riot 官方 CDN，保证图片最新且项目体积小。
+
+```typescript
+// config/ddragon.ts
+
+const DDRAGON_VERSION = '14.10.1';  // 可通过 https://ddragon.leagueoflegends.com/api/versions.json 获取最新版
+const DDRAGON_BASE = `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}`;
+
+export const ddragon = {
+  /** 英雄头像 48x48 */
+  championIcon: (championKey: string) =>
+    `${DDRAGON_BASE}/img/champion/${championKey}.png`,
+
+  /** 英雄立绘 Loading 图 */
+  championSplash: (championKey: string) =>
+    `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championKey}_0.jpg`,
+
+  /** 技能图标 */
+  spellIcon: (spellId: string) =>
+    `${DDRAGON_BASE}/img/spell/${spellId}.png`,
+
+  /** 被动技能图标 */
+  passiveIcon: (filename: string) =>
+    `${DDRAGON_BASE}/img/passive/${filename}`,
+
+  /** 召唤师技能图标 */
+  summonerSpellIcon: (spellId: string) =>
+    `${DDRAGON_BASE}/img/spell/${spellId}.png`,
+};
+```
+
+**使用示例：**
+```typescript
+// 英雄 "TwistedFate" 的头像
+ddragon.championIcon('TwistedFate')
+// → https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/TwistedFate.png
+```
+
+**`champions-index.ts`** 只存 ID → Key 映射 + 中文名，不存图片路径：
+```typescript
+// data/champions-index.ts
+export const CHAMPION_INDEX: Record<number, { key: string; name: string; title: string }> = {
+  41:  { key: 'Gangplank',  name: '海洋之灾', title: '普朗克' },
+  136: { key: 'AurelionSol', name: '铸星龙王', title: '奥瑞利安·索尔' },
+  // ...
+};
 ```
 
 ---
 
-## 七、组件层级与职责
+## 九、组件层级与职责
 
 ```
 <ChampSelectPage>                    # features/champ-select/index.tsx
@@ -352,11 +606,11 @@ interface ChampSelectState {
 
 ---
 
-## 八、五阶段开发计划
+## 十、五阶段开发计划
 
 ### 阶段 1：项目初始化 + 环境搭建
 
-**目标：** 创建 Vite + React + TS 项目，配置 Tailwind、Zustand，建立目录结构。
+**目标：** 创建 Vite + React + TS 项目，配置 Tailwind、Zustand，建立目录结构和服务层抽象。
 
 **任务清单：**
 
@@ -365,12 +619,15 @@ interface ChampSelectState {
 - [ ] 1.3 配置 `tsconfig.json` 开启严格模式（`strict: true`，禁用 `any`）
 - [ ] 1.4 配置 Tailwind CSS（`tailwind.config.js` + `postcss.config.js`）
 - [ ] 1.5 在 Tailwind 配置中扩展 LOL 主题色和字体
-- [ ] 1.6 创建项目目录结构（`components/` `features/` `services/` `data/` `styles/`）
-- [ ] 1.7 编写 CSS 变量（`globals.css` 中定义 Design Tokens）
-- [ ] 1.8 创建 `types.ts` 完整类型定义
-- [ ] 1.9 创建 `mock-champions.ts`（至少 20 个英雄的 Mock 数据）
-- [ ] 1.10 创建 Zustand Store 骨架（`store.ts`）
-- [ ] 1.11 搭建 `App.tsx` + `main.tsx` 基础路由
+- [ ] 1.6 创建项目目录结构（`components/` `features/` `services/` `config/` `data/` `styles/`）
+- [ ] 1.7 编写环境变量配置（`.env.development` + `config/env.ts`）
+- [ ] 1.8 编写 CSS 变量（`globals.css` 中定义 Design Tokens）
+- [ ] 1.9 创建 `features/champ-select/types.ts` 完整类型定义
+- [ ] 1.10 创建服务层接口定义（`services/api.ts` + `services/websocket.ts` 的接口）
+- [ ] 1.11 创建 Data Dragon 配置（`config/ddragon.ts` + `data/champions-index.ts` 至少 20 个英雄）
+- [ ] 1.12 创建 Mock 实现（`services/mock/mock-api.ts` + `mock-ws.ts` + `mock-room.ts`）
+- [ ] 1.13 创建 Zustand Store 骨架（`store.ts`，包含 `initWs` 和 `handleWsResponse`）
+- [ ] 1.14 搭建 `App.tsx` + `main.tsx`（根据 `config.USE_MOCK` 选择服务实现）
 
 **验收标准：**
 - `npm run dev` 能正常启动
@@ -520,29 +777,32 @@ git push origin master
 
 ---
 
-### 阶段 5：Store 联调 + 交互完善 + WebSocket 预留
+### 阶段 5：Store 联调 + 交互完善 + WebSocket 接入
 
-**目标：** 打通前端完整交互流程，完善动画过渡，预留 WebSocket 接口。
+**目标：** 打通前端完整交互流程，完善动画过渡，Mock WS 跑通全链路。
 
 **任务清单：**
 
 - [ ] 5.1 完善 Zustand Store 交互逻辑
-  - `selectChampion` → 更新选中状态 + 详情面板 + 自己 Slot 头像
-  - `reroll` → 随机替换可用英雄池 + 更新板凳席
+  - `initWs` → 创建 WS 服务实例 + 订阅消息 + 连接房间
+  - `handleWsResponse` → 统一分发 WS 服务端推送，更新对应状态
+  - `selectChampion` → 更新选中状态 + 调用 `wsService.send()`
+  - `reroll` → 调用 `wsService.send()` → Mock WS 推送 `POOL_UPDATE`
   - `swapFromBench` → 板凳英雄与当前选中交换
   - `lockIn` → 切换 phase 为 LOCKED
+  - `dispose` → 断开 WS 连接 + 清理定时器
 - [ ] 5.2 添加 CSS 过渡动画
   - 英雄头像 hover 发光渐变
   - 选中边框出现动画
   - 详情面板切换淡入淡出
   - 按钮点击反馈
-- [ ] 5.3 WebSocket 服务层预埋
-  - `services/websocket.ts`：封装 `connect()` `disconnect()` `send(action)` `subscribe(callback)`
-  - 接口定义与 `types.ts` 中的 `WSAction` / `WSResponse` 对齐
-  - 当前阶段用 mock 实现（`setTimeout` 模拟网络延迟）
+- [ ] 5.3 完善 Mock WS 全链路
+  - mock-ws.ts 模拟倒计时每秒推送 `TICK`
+  - mock-ws.ts 处理 `SELECT_CHAMPION` 后广播 `PLAYER_PICK`
+  - mock-ws.ts 处理 `REROLL` 后随机刷新英雄池并推送 `POOL_UPDATE`
+  - 验证：Mock 模式下完整走通「选英雄 → 查看详情 → 确认选择 → 锁定 → 倒计时结束」
 - [ ] 5.4 Mock 数据扩展
-  - 补充至 40+ 英雄数据
-  - 每个英雄包含完整技能信息
+  - 补充至 40+ 英雄数据（使用 Data Dragon CDN）
   - 添加召唤师技能和符文 Mock 数据
 - [ ] 5.5 最终视觉还原检查
   - 对照截图逐像素检查
@@ -566,7 +826,41 @@ git push origin master
 
 ---
 
-## 九、开发命令速查
+## 十一、Mock → SpringBoot 切换指南
+
+后期接入 SpringBoot 时，只需以下步骤，**组件代码零改动**：
+
+```
+步骤 1：修改环境变量
+  .env.production → VITE_USE_MOCK=false
+
+步骤 2：实现真实服务
+  services/api.ts → 完成 createRealApiService()
+  services/websocket.ts → 完成 createRealWsService()
+
+步骤 3：确认协议对齐
+  HTTP 端点、STOMP destination、消息格式与后端一致
+
+步骤 4：构建部署
+  npm run build → 产物交给 SpringBoot 或 Nginx 托管
+```
+
+**架构保障：**
+```
+组件层（ChampionPool / TeamPanel / ...）
+        ↓ 只读写 Store
+Zustand Store
+        ↓ 调用 wsService.send() / wsService.subscribe()
+服务层接口（IWebSocketService / IApiService）
+        ↓
+  ┌─────┴─────┐
+  Mock 实现    Real 实现（STOMP）
+  (前端独立)   (对接 SpringBoot)
+```
+
+---
+
+## 十二、开发命令速查
 
 ```bash
 # 初始化项目
@@ -589,12 +883,15 @@ npm run build
 
 ---
 
-## 十、注意事项
+## 十三、注意事项
 
 1. **禁止使用 `any`** — 所有类型必须显式声明，WS 消息使用联合类型
 2. **菱形切角** — 统一使用 `clip-path`，不要用 border-radius
 3. **深色电竞风格** — 所有面板背景色在 `#091428 ~ #0E2042` 之间
 4. **金色边框** — 使用 `#C8AA6E` 及其渐变，不用亮黄色
 5. **字体** — 中文使用系统默认，英文/数字使用 `Beaufort, sans-serif` 风格
-6. **Mock 优先** — 前 4 个阶段完全不连后端，所有数据来自 Mock
+6. **Mock 优先** — 前 5 个阶段完全不连后端，`VITE_USE_MOCK=true`
 7. **每阶段验收** — 每完成一个阶段必须停止，等待确认后再继续
+8. **英雄图片不本地存储** — 全部使用 Data Dragon CDN 引用
+9. **组件不直接调服务** — 组件只读写 Zustand Store，Store 内部调用服务层
+10. **WS 接口即契约** — `WSAction` 和 `WSResponse` 类型就是前后端的接口契约，修改时双方同步
