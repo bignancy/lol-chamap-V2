@@ -10,6 +10,8 @@ import { ChampionPool } from './features/champ-select/components/ChampionPool';
 import { BenchRow } from './features/champ-select/components/BenchRow';
 import { RerollBar } from './features/champ-select/components/RerollBar';
 import { TeamPanel } from './features/champ-select/components/TeamPanel';
+import { ChampionDetail } from './features/champ-select/components/ChampionDetail';
+import { FooterBar } from './features/champ-select/components/FooterBar';
 
 function App() {
   const { initWs, setAllChampions, allChampions, myTeam, enemyTeam } = useChampSelectStore();
@@ -46,40 +48,32 @@ function App() {
     >
       <HeaderBar />
 
-      <div className="flex flex-1 flex-col overflow-hidden gap-2 p-3">
-        {/* Countdown */}
-        <Countdown />
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left side: Pool + Teams */}
+        <div className="flex flex-1 flex-col overflow-hidden p-3 gap-2">
+          <Countdown />
+          <ChampionPool />
+          <BenchRow />
+          <RerollBar />
 
-        {/* Champion Pool */}
-        <ChampionPool />
-
-        {/* Bench Row */}
-        <BenchRow />
-
-        {/* Reroll Bar */}
-        <RerollBar />
-
-        {/* Team Panels */}
-        <div className="flex flex-1 gap-4">
-          <TeamPanel team={myTeam} side="BLUE" />
-
-          {/* Center divider */}
-          <div
-            className="w-px shrink-0 self-stretch"
-            style={{ backgroundColor: 'var(--gold-dark)' }}
-          />
-
-          <TeamPanel team={enemyTeam} side="RED" />
+          {/* Team Panels */}
+          <div className="flex flex-1 gap-3">
+            <TeamPanel team={myTeam} side="BLUE" />
+            <div
+              className="w-px shrink-0 self-stretch"
+              style={{ backgroundColor: 'var(--gold-dark)' }}
+            />
+            <TeamPanel team={enemyTeam} side="RED" />
+          </div>
         </div>
 
-        {/* TODO: Phase 4 - Champion Detail + Footer */}
-        <div
-          className="py-2 text-center text-xs"
-          style={{ color: 'var(--text-disabled)' }}
-        >
-          阶段 4 - 英雄详情 + 底部栏待开发
+        {/* Right side: Champion Detail */}
+        <div className="w-[380px] shrink-0 p-3">
+          <ChampionDetail />
         </div>
       </div>
+
+      <FooterBar />
     </div>
   );
 }
